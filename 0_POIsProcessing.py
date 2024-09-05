@@ -20,7 +20,6 @@ def Time_Decorator(func):
     return wrapper
 
 
-@Time_Decorator
 def Creat_New_GDB(rootgdb, gdbname, gdbfullname):
     if not arcpy.Exists(gdbfullname):
         arcpy.CreateFileGDB_management(rootgdb, gdbname)
@@ -77,13 +76,59 @@ def CSV_to_Shapfile(rawpoi, gdbpath):
     return
 
 
+@Time_Decorator
+def POI_Export_by_Category(gdb_fold, catogry, type, outgdb_fold):
+    where_clause = f"{catogry} = '{type}'"
+    gdb_list = os.listdir(gdb_fold)
+    for gdb in gdb_list:
+        gdb_path = os.path.join(gdb_fold, gdb)
+        outgdb_path = os.path.join(outgdb_fold, gdb)
+        Creat_New_GDB(outgdb_fold, gdb, outgdb_path)
+
+        arcpy.env.workspace = gdb_path
+        arcpy.env.overwriteOutput = True
+        all_poi = arcpy.ListFeatureClasses()
+
+        for poi in all_poi:
+            outpoi_path = os.path.join(outgdb_path, f'{poi}POI_{type}')
+            arcpy.ExportFeatures_conversion(poi, outpoi_path, where_clause)
+            print(f'{poi} done!')
+    return
+
+
 if __name__ == "__main__":
     RootPath = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/9-中国POI数据/'
-    GDBPath = os.path.join(RootPath, '全国各省地级市POI/')
-    RawPOIPath = os.path.join(RootPath, 'POI原始数据/')
+    RawPOIPath = os.path.join(RootPath, '9.0-全国地级市POI原始数据/')
+    GDBPath = os.path.join(RootPath, '9.1-全国各省地级市POI/')
 
     # 1.将每个省一个csv文件的poi按照地级市分割
     # Split_POI_by_Dijishi(RawPOIPath)
 
     # 2.新建每个省份/直辖市的GDB,并存放转换为shp的poi
     CSV_to_Shapfile(RawPOIPath, GDBPath)
+
+    # 3.按照大类导出
+    poi_category_I = '大类'
+    poi_category_type_I = '公司企业'
+    out_fold_path_I = os.path.join(RootPath, '9.2-全国地级市POI_大类_公司企业')
+    # POI_Export_by_Category(GDBPath, poi_category_I, poi_category_type_I, out_fold_path_I)
+
+    # 4.按照中类导出
+    poi_category_II = '中类'
+    poi_category_type_II = '工厂'
+    out_fold_path_II = os.path.join(RootPath, '9.3-全国地级市POI_中类_工厂')
+    # POI_Export_by_Category(GDBPath, poi_category_II, poi_category_type_II, out_fold_path_II)
+
+    # 5.为工厂建立缓冲区
+    out = os.path.join(RootPath, '9.4-全国地级市POI_中类_工厂_缓冲区')
+
+
+
+
+
+
+
+
+
+
+
