@@ -5,7 +5,8 @@ import os
 import functools
 import time
 import pandas as pd
-
+import re
+import fnmatch
 
 def Time_Decorator(func):
     # 输出函数运行时间的修饰器
@@ -21,9 +22,9 @@ def Time_Decorator(func):
     return wrapper
 
 
-def Creat_New_GDB(rootgdb, gdbname, gdbfullname):
+def Creat_New_GDB(rootpath, gdbname, gdbfullname):
     if not arcpy.Exists(gdbfullname):
-        arcpy.CreateFileGDB_management(rootgdb, gdbname)
+        arcpy.CreateFileGDB_management(rootpath, gdbname)
         print(f'{gdbname} created successfully!')
     else:
         print(f'{gdbname} is already exists!')
@@ -155,8 +156,54 @@ def POI_Single_Buff_to_Shp(in_path, out_path):
             # 遍历每一个地级市缓冲区图层,并输出每一座工厂的缓冲区
             in_featureclass = os.path.join(gdb_path, poi)
             FeatureClass_to_SingleFeatureClass(in_featureclass, dijishi_gdb_path)
-
     return
+
+
+@Time_Decorator
+def Landuse_Clip_by_Province(in_shp_path, clip_shp_path, out_shp_path):
+    # 全国的土地利用,切分为以省为单位
+    prov_gdb_list = os.listdir(clip_shp_path)
+    for gdb in prov_gdb_list:
+        prov_gdb = os.path.join(clip_shp_path, gdb)
+        # print(prov_gdb)
+        arcpy.env.workspace = prov_gdb
+        prov_shp_list = arcpy.ListFeatureClasses()
+        for prov_shp in prov_shp_list:
+            # print(prov_shp)
+            out_name = re.sub(r"_.*", "", str(prov_shp))
+            out_name = f'{out_name}_Euluc.shp'
+            out_path = os.path.join(out_shp_path, out_name)
+            arcpy.Clip_analysis(in_shp_path, prov_shp, out_path)
+            print(f'{out_name} done!')
+
+@Time_Decorator
+def Landuse_Indentify_Single_Buff(landuse_fold, landuse_iden_fold, poi_path):
+    prov_landuse_fold = os.listdir(landuse_fold)
+    prov_landuse_fold = fnmatch.filter(prov_landuse_fold, '*.shp')
+    for prov_landuse in prov_landuse_fold:
+        prov_landuse_path = os.path.join(landuse_fold, prov_landuse)
+        prov_name = re.sub(r"_.*", "", str(prov_landuse))
+        print(prov_landuse_path)
+
+        # 创建输出文件夹,不存在则新建
+        # out_single_buff_iden_dir = os.path.join(landuse_iden_fold, prov_name)
+        # Create_New_Dir(out_single_buff_iden_dir, prov_name)
+
+        single_poi_buff = os.listdir(poi_path)
+        for single_buff_gdb in single_poi_buff:
+            single_buff_gdb_path = os.path.join(poi_path, single_buff_gdb)
+            # 以地级市为单位创建新的gdb数据库,存储输出结果
+            out_single_buff_iden_gdb = os.path.join(landuse_iden_fold, single_buff_gdb)
+            Creat_New_GDB(landuse_iden_fold, single_buff_gdb, out_single_buff_iden_gdb)
+
+            # 遍历存储各省POI缓冲区的gdb,并与土地利用识别分析
+            arcpy.env.workspace = single_buff_gdb_path
+            dijishi_single_buff = arcpy.ListFeatureClasses()
+            for single in dijishi_single_buff:
+                out_single_buff_iden_name = os.path.join(out_single_buff_iden_gdb, single)
+                in_sijishi_single_buff = os.path.join(single_buff_gdb_path, single)
+                arcpy.analysis.Identity(in_sijishi_single_buff, prov_landuse_path, f'{out_single_buff_iden_name}_iden')
+                print(f'{out_single_buff_iden_name} done!')
 
 
 if __name__ == "__main__":
@@ -187,9 +234,22 @@ if __name__ == "__main__":
     buff_distance = 1000
     # Create_Buffer_of_POI(buff_distance, out_fold_path_II, out_poi_buff_fold)
 
-    # 6.输出每一个缓冲区为shp
+    # 6.输出每一个缓冲区为shp(后面的代码优化了这一步骤,不再单独输出每一个缓冲区,采取先裁剪后合并的策略)
     out_single_buff_fold = os.path.join(RootPath, '9.5-全国地级市POI_中类_工厂_缓冲区_逐个输出')
-    POI_Single_Buff_to_Shp(out_poi_buff_fold, out_single_buff_fold)
+    # POI_Single_Buff_to_Shp(out_poi_buff_fold, out_single_buff_fold)
+
+    # 7.使用每个缓冲区识别土地利用数据
+    # 土地利用路径
+    RootPath_II = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/10-中国EULUC数据/'
+    Landuse_Fold = os.path.join(RootPath_II, '10.0-EULUC-2018/')
+    # 读取中国分省矢量,切割土地利用,为后续分块处理准备
+    ProvinceShp = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/0-中国分省矢量/'
+    Out_Landuse_Fold = os.path.join(RootPath_II, '10.1-EULUC-2018_单个省市/')
+    landuse = os.path.join(Landuse_Fold, 'euluc-latlonnw.shp')
+    # 构建输出路径
+    landuse_identity_fold = os.path.join(RootPath, '10.2-全国各地级市EULUC_中类_工厂_缓冲区识别/')
+    # Landuse_Indentify_Single_Buff(Out_Landuse_Fold, landuse_identity_fold, out_poi_buff_fold)
+
 
 
 
