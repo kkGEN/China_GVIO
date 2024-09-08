@@ -176,34 +176,48 @@ def Landuse_Clip_by_Province(in_shp_path, clip_shp_path, out_shp_path):
             arcpy.Clip_analysis(in_shp_path, prov_shp, out_path)
             print(f'{out_name} done!')
 
+
 @Time_Decorator
 def Landuse_Indentify_Single_Buff(landuse_fold, landuse_iden_fold, poi_path):
     prov_landuse_fold = os.listdir(landuse_fold)
     prov_landuse_fold = fnmatch.filter(prov_landuse_fold, '*.shp')
     for prov_landuse in prov_landuse_fold:
         prov_landuse_path = os.path.join(landuse_fold, prov_landuse)
-        prov_name = re.sub(r"_.*", "", str(prov_landuse))
+        prov_name = re.sub(r"_.*", ".gdb", prov_landuse)
         print(prov_landuse_path)
 
-        # 创建输出文件夹,不存在则新建
-        # out_single_buff_iden_dir = os.path.join(landuse_iden_fold, prov_name)
-        # Create_New_Dir(out_single_buff_iden_dir, prov_name)
+        # 以地级市为单位创建新的gdb数据库,存储输出结果
+        out_single_buff_iden_gdb = os.path.join(landuse_iden_fold, prov_name)
+        Creat_New_GDB(landuse_iden_fold, prov_name, out_single_buff_iden_gdb)
 
-        single_poi_buff = os.listdir(poi_path)
-        for single_buff_gdb in single_poi_buff:
-            single_buff_gdb_path = os.path.join(poi_path, single_buff_gdb)
-            # 以地级市为单位创建新的gdb数据库,存储输出结果
-            out_single_buff_iden_gdb = os.path.join(landuse_iden_fold, single_buff_gdb)
-            Creat_New_GDB(landuse_iden_fold, single_buff_gdb, out_single_buff_iden_gdb)
+        # 遍历存储各省POI缓冲区的gdb,并与土地利用识别分析
+        single_buff_gdb_path = os.path.join(poi_path, prov_name)
+        arcpy.env.workspace = single_buff_gdb_path
+        dijishi_single_buff = arcpy.ListFeatureClasses()
+        for single in dijishi_single_buff:
+            out_single_buff_iden_name = os.path.join(out_single_buff_iden_gdb, single)
+            in_sijishi_single_buff = os.path.join(single_buff_gdb_path, single)
+            arcpy.analysis.Identity(in_sijishi_single_buff, prov_landuse_path, f'{out_single_buff_iden_name}_iden')
+            print(f'{out_single_buff_iden_name} done!')
 
-            # 遍历存储各省POI缓冲区的gdb,并与土地利用识别分析
-            arcpy.env.workspace = single_buff_gdb_path
-            dijishi_single_buff = arcpy.ListFeatureClasses()
-            for single in dijishi_single_buff:
-                out_single_buff_iden_name = os.path.join(out_single_buff_iden_gdb, single)
-                in_sijishi_single_buff = os.path.join(single_buff_gdb_path, single)
-                arcpy.analysis.Identity(in_sijishi_single_buff, prov_landuse_path, f'{out_single_buff_iden_name}_iden')
-                print(f'{out_single_buff_iden_name} done!')
+
+@Time_Decorator
+def Landuse_Dissolve(lu_iden_fold, lu_diss_fold):
+    landuse_iden_gdb = os.listdir(lu_iden_fold)
+    for iden_gdb in landuse_iden_gdb:
+        iden_gdb_path = os.path.join(lu_iden_fold, iden_gdb)
+
+        # 设置输出路径
+        out_iden_gdb_path = os.path.join(lu_diss_fold, iden_gdb)
+        Creat_New_GDB(lu_diss_fold, iden_gdb, out_iden_gdb_path)
+
+        # 对相同id的各类土地利用进行聚合
+        arcpy.env.workspace = iden_gdb_path
+        iden_path_list = arcpy.ListFeatureClasses()
+        for iden in iden_path_list:
+            out_iden = os.path.join(out_iden_gdb_path, re.sub(r'POI_工厂_buff_iden', '_FactoryLU', iden))
+            arcpy.management.Dissolve(iden, out_iden, ["ORIG_FID", "Level2"])  #, "SINGLE_PART", "DISSOLVE_LINES"
+        print(f'{iden_gdb} done!')
 
 
 if __name__ == "__main__":
@@ -247,8 +261,45 @@ if __name__ == "__main__":
     Out_Landuse_Fold = os.path.join(RootPath_II, '10.1-EULUC-2018_单个省市/')
     landuse = os.path.join(Landuse_Fold, 'euluc-latlonnw.shp')
     # 构建输出路径
-    landuse_identity_fold = os.path.join(RootPath, '10.2-全国各地级市EULUC_中类_工厂_缓冲区识别/')
+    landuse_identity_fold = os.path.join(RootPath_II, '10.2-全国各地级市EULUC_中类_工厂_缓冲区识别/')
     # Landuse_Indentify_Single_Buff(Out_Landuse_Fold, landuse_identity_fold, out_poi_buff_fold)
+
+    # 8.将识别后的土地利用,按照工厂ID和土地利用类型重新融合,得到每个工厂一定空间范围内的土地利用类型
+    landuse_disso_fold = os.path.join(RootPath_II, '10.3-全国各地级市EULUC_中类_工厂_缓冲区内土地利用/')
+    # Landuse_Dissolve(landuse_identity_fold, landuse_disso_fold)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
