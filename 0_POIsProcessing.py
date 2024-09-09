@@ -177,7 +177,7 @@ def Landuse_Clip_by_Province(in_shp_path, clip_shp_path, out_shp_path):
             print(f'{out_name} done!')
 
 
-@Time_Decorator
+# [废弃]
 def Landuse_Indentify_Single_Buff(landuse_fold, landuse_iden_fold, poi_path):
     prov_landuse_fold = os.listdir(landuse_fold)
     prov_landuse_fold = fnmatch.filter(prov_landuse_fold, '*.shp')
@@ -201,7 +201,7 @@ def Landuse_Indentify_Single_Buff(landuse_fold, landuse_iden_fold, poi_path):
             print(f'{out_single_buff_iden_name} done!')
 
 
-@Time_Decorator
+# [废弃]
 def Landuse_Dissolve(lu_iden_fold, lu_diss_fold):
     landuse_iden_gdb = os.listdir(lu_iden_fold)
     for iden_gdb in landuse_iden_gdb:
@@ -217,7 +217,43 @@ def Landuse_Dissolve(lu_iden_fold, lu_diss_fold):
         for iden in iden_path_list:
             out_iden = os.path.join(out_iden_gdb_path, re.sub(r'POI_工厂_buff_iden', '_FactoryLU', iden))
             arcpy.management.Dissolve(iden, out_iden, ["ORIG_FID", "Level2"])  #, "SINGLE_PART", "DISSOLVE_LINES"
-        print(f'{iden_gdb} done!')
+            print(f'{iden} done!')
+
+
+@Time_Decorator
+def Landuse_in_Buff(landuse_fold, landuse_iden_fold, poi_path):
+    prov_landuse_fold = os.listdir(landuse_fold)
+    prov_landuse_fold = fnmatch.filter(prov_landuse_fold, '*.shp')
+    for prov_landuse in prov_landuse_fold:
+        prov_landuse_path = os.path.join(landuse_fold, prov_landuse)
+        prov_name = re.sub(r"_.*", ".gdb", prov_landuse)
+        print(prov_landuse_path)
+
+        # 以地级市为单位创建新的gdb数据库,存储输出结果
+        out_single_buff_iden_gdb = os.path.join(landuse_iden_fold, prov_name)
+        Creat_New_GDB(landuse_iden_fold, prov_name, out_single_buff_iden_gdb)
+
+        # 遍历存储各省POI缓冲区的gdb,并与土地利用识别分析
+        single_buff_gdb_path = os.path.join(poi_path, prov_name)
+        arcpy.env.workspace = single_buff_gdb_path
+        dijishi_single_buff = arcpy.ListFeatureClasses()
+        for single in dijishi_single_buff:
+            out_single_buff_iden_name = os.path.join(out_single_buff_iden_gdb, single)
+            out_single_buff_iden_name = f'{out_single_buff_iden_name}_iden'
+            in_sijishi_single_buff = os.path.join(single_buff_gdb_path, single)
+
+            arcpy.env.workspace = out_single_buff_iden_gdb
+            arcpy.env.overwriteOutput = True
+
+            arcpy.analysis.Identity(in_sijishi_single_buff, prov_landuse_path, out_single_buff_iden_name)
+            print(f'{out_single_buff_iden_name} identity done!')
+            out_dissolve_name = re.sub(r'POI_工厂_buff_iden', '_FactoryLU', out_single_buff_iden_name)
+            arcpy.management.Dissolve(out_single_buff_iden_name, out_dissolve_name, ["ORIG_FID", "Level2"])
+            print(f'{out_dissolve_name} dissolve done!')
+            arcpy.Delete_management(out_single_buff_iden_name)
+            print(f'{out_single_buff_iden_name} identity deleted!')
+
+    return
 
 
 if __name__ == "__main__":
@@ -244,30 +280,20 @@ if __name__ == "__main__":
     # POI_Export_by_Category(GDBPath, poi_category_II, poi_category_type_II, out_fold_path_II)
 
     # 5.为工厂建立缓冲区
-    out_poi_buff_fold = os.path.join(RootPath, '9.4-全国地级市POI_中类_工厂_缓冲区')
-    buff_distance = 1000
+    out_poi_buff_fold = os.path.join(RootPath, '9.4-全国地级市POI_中类_工厂_缓冲区_500m')
+    buff_distance = 500
     # Create_Buffer_of_POI(buff_distance, out_fold_path_II, out_poi_buff_fold)
 
     # 6.输出每一个缓冲区为shp(后面的代码优化了这一步骤,不再单独输出每一个缓冲区,采取先裁剪后合并的策略)
-    out_single_buff_fold = os.path.join(RootPath, '9.5-全国地级市POI_中类_工厂_缓冲区_逐个输出')
+    # out_single_buff_fold = os.path.join(RootPath, '9.5-全国地级市POI_中类_工厂_缓冲区_逐个输出')
     # POI_Single_Buff_to_Shp(out_poi_buff_fold, out_single_buff_fold)
 
     # 7.使用每个缓冲区识别土地利用数据
     # 土地利用路径
-    RootPath_II = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/10-中国EULUC数据/'
-    Landuse_Fold = os.path.join(RootPath_II, '10.0-EULUC-2018/')
-    # 读取中国分省矢量,切割土地利用,为后续分块处理准备
-    ProvinceShp = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/0-中国分省矢量/'
-    Out_Landuse_Fold = os.path.join(RootPath_II, '10.1-EULUC-2018_单个省市/')
-    landuse = os.path.join(Landuse_Fold, 'euluc-latlonnw.shp')
-    # 构建输出路径
-    landuse_identity_fold = os.path.join(RootPath_II, '10.2-全国各地级市EULUC_中类_工厂_缓冲区识别/')
-    # Landuse_Indentify_Single_Buff(Out_Landuse_Fold, landuse_identity_fold, out_poi_buff_fold)
-
-    # 8.将识别后的土地利用,按照工厂ID和土地利用类型重新融合,得到每个工厂一定空间范围内的土地利用类型
-    landuse_disso_fold = os.path.join(RootPath_II, '10.3-全国各地级市EULUC_中类_工厂_缓冲区内土地利用/')
-    # Landuse_Dissolve(landuse_identity_fold, landuse_disso_fold)
-
+    RootPath_II = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/10-中国EULUC数据_500m/'
+    Single_Prov_Landuse_Fold = os.path.join(RootPath_II, '10.1-EULUC-2018_单个省市/')
+    Out_Landuse_fold = os.path.join(RootPath_II, '10.2-全国各地级市EULUC_工厂缓冲区内土地利用/')
+    # Landuse_in_Buff(Single_Prov_Landuse_Fold, Out_Landuse_fold, out_poi_buff_fold)
 
 
 
