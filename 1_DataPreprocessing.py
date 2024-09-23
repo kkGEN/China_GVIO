@@ -1,16 +1,13 @@
-# -*- coding: UTF-8 -*-
-import torch
-import pandas as pd
-import geopandas as gpd
-import random
-import fnmatch
+# -*- coding: utf-8 -*-
+import arcpy
+import arcpy.da
+import os
 import functools
 import time
-from osgeo import gdal, ogr, osr
-import os
-ogr.UseExceptions()
-gdal.UseExceptions()
-gdal.SetConfigOption('SHAPE_ENCODING', 'UTF-8')
+import codecs
+import pandas as pd
+import re
+import fnmatch
 
 def Time_Decorator(func):
     # 输出函数运行时间的修饰器
@@ -21,236 +18,128 @@ def Time_Decorator(func):
         print(f'{func.__name__} Start_time: {start_time_str}.')
         result = func(*args, **kwargs)
         end_time = time.time()
-        print(f'{func.__name__} Excution_time: {end_time-start_time}.')
+        print(f'{func.__name__} Excution_time: {end_time - start_time}.')
         return result
     return wrapper
 
 
-# 通过文件路径读取GDB中的layer,并返回数据集和图层数量
-def Open_GDB_by_GDAL(gdbPath):
-    # driver = gdal.GetDriverByName('OpenFileGDB')
-    gdb_dataset = gdal.OpenEx(gdbPath, gdal.OF_VECTOR)
-    if gdb_dataset is None:
-        print('无法打开GDB数据源！')
-        exit(1)
-    # 获取图层数量
-    layer_count = gdb_dataset.GetLayerCount()
-    # layer = gdb_dataset.GetLayer(0)
-    # print(layer_count)
-
-    # feature_count = layer.GetFeatureCount()
-    # feature = layer.GetNextFeature()
-    #
-    # while feature:
-    #     feature_attris = feature.GetField(0)
-    #     print(feature_attris)
-    #
-    #     feature = layer.GetNextFeature()
-    #
-    # gdb_dataset = None
-    return gdb_dataset, layer_count
+def Creat_New_GDB(rootpath, gdbname, gdbfullname):
+    if not arcpy.Exists(gdbfullname):
+        arcpy.CreateFileGDB_management(rootpath, gdbname)
+        print(f'{gdbname} created successfully!')
+    else:
+        print(f'{gdbname} is already exists!')
 
 
-# 通过文件路径读取shapefile,
-def Open_Shp_by_GDAL(shp_path):
-    dataset = ogr.Open(shp_path, 0)
-    if dataset is None:
-        print('无法打开ShapeFile数据源！')
-        exit(1)
-    layer_count = dataset.GetLayerCount()
-    return dataset, layer_count
+def Create_New_Dir(out_path, out_name):
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+        print(f'{out_name} created successfully!')
+    else:
+        print(f'{out_name} is already exists!')
 
 
-def Creat_Buff_of_Points(Layer, distance, Outname):
-    # 创建用于存储结果的新数据源
-    output_driver = ogr.GetDriverByName('ESRI Shapefile')
-    output_dataset = output_driver.CreateDataSource(Outname)
-    output_layer = output_dataset.CreateLayer('buffers', srs=Layer.GetSpatialRef())
+def ReadFile(filePath,encoding="utf-8"):
+    with codecs.open(filePath, "r", encoding) as f:
+        return f.read()
 
-    # 设置新图层的属性字段与原始图层一致
-    output_layer_defn = Layer.GetLayerDefn()
-    for i in range(output_layer_defn.GetFieldCount()):
-        fieldDefn = output_layer_defn.GetFieldDefn(i)
-        output_layer.CreateField(fieldDefn)
 
-    # 逐个feature建立缓冲区
-    feature = Layer.GetNextFeature()
-    while feature:
-        # 获取原始POI图层的几何参考，使用Buffer函数构建缓冲区
-        geometry = feature.GetGeometryRef()
-        buffer_geometry = geometry.Buffer(distance)
-
-        # 创建新的要素，并拷贝原始属性和设置其缓冲区几何属性
-        new_feature = ogr.Feature(Layer.GetLayerDefn())
-        new_feature.SetGeometry(buffer_geometry)
-
-        new_featureDefn = Layer.GetLayerDefn()
-        # 添加属性及要素到新图层
-        for i in range(new_featureDefn.GetFieldCount()):
-            new_feature.SetField(i, feature.GetField(i))  # 输出字段乱码问题有待解决
-        output_layer.CreateFeature(new_feature)
-
-        # 销毁特征对象，以释放资源
-        new_feature.Destroy()
-        feature = Layer.GetNextFeature()
-    return
+def WriteFile(filePath, u, encoding="utf-8-sig"):
+    with codecs.open(filePath, "wb") as f:
+        f.write(u.encode(encoding, errors="ignore"))
 
 
 @Time_Decorator
-def Poi_Buff_of_China(poi_path, out_path, buff_distance):
-    # 读取gdb中的图层，返回图层集合和数量
-    POIs_Dataset, POIs_LayerCount = Open_GDB_by_GDAL(poi_path)
-    # 按照图层数量，逐个读取图层
-    for layercount in range(POIs_LayerCount):
-        # 遍历读取每一个poi图层，并获取图层的名称
-        poi_layer = POIs_Dataset.GetLayer(layercount)
-        print(poi_layer.GetName())
-        out_buff_name = os.path.join(out_path, f'{poi_layer.GetName()}.shp')
-        # 调用缓冲区函数，对每个图层的poi建立缓冲区
-        Creat_Buff_of_Points(poi_layer, buff_distance, out_buff_name)
-    return
-
-
-def Feature_to_Layer(feature, old_layer, out_path, new_layer_name):
-    # feature：原始图层的特征
-    # old_layer：原始图层
-    # out_path：输出路径
-    # new_layer_name:新图层的名字
-
-    # 创建一个新的图层
-    output_driver = ogr.GetDriverByName('ESRI Shapefile')
-    output_dataset = output_driver.CreateDataSource(out_path)
-    check_file_exist = random.randint(1, 99)
-    out_new_path = os.path.join(out_path, f'{new_layer_name}.shp')
-    if os.path.exists(out_new_path):
-        print(f'{new_layer_name} is already exists!')
-        new_layer_name = f'{new_layer_name}_{check_file_exist}'
-
-    # 注意：一些工厂会出现不明确指代,如多个面粉厂,在上一步添加随机数后仍可能重复,这里选择跳过
-    try:
-        new_layer = output_dataset.CreateLayer(new_layer_name, srs=old_layer.GetSpatialRef())
-        # 设置新图层的属性字段与原始图层一致
-        new_layer_defn = old_layer.GetLayerDefn()
-        for i in range(new_layer_defn.GetFieldCount()):
-            fieldDefn = new_layer_defn.GetFieldDefn(i)
-            new_layer.CreateField(fieldDefn)
-
-        # 从原始图层中获取字段名称、几何信息等，传入新的feature
-        new_featureDefn = old_layer.GetLayerDefn()
-        new_feature = ogr.Feature(new_featureDefn)
-        new_feature.SetGeometry(feature.GetGeometryRef())
-
-        # 逐个字段进行赋值
-        for i in range(new_featureDefn.GetFieldCount()):
-            new_feature.SetField(i, feature.GetField(i))  # 输出字段乱码问题有待解决
-        new_layer.CreateFeature(new_feature)
-        new_feature.Destroy()
-    except:
-        print(f'{new_layer_name} is not handled well!')
-    finally:
-        pass
-
-
-def Clip_Vector(input_layer, output_layer, clip_layer):
-    result = gdal.Warp(output_layer, input_layer, format='ESRI Shapefile',
-                       cutlineDSName=clip_layer, cropToCutline=True)
-
-    # in_lyr.Clip(method_lyr, out_lyr)
-    result.FlushCache()
+def UTF8_2_GBK(src, dst):
+    # 转换UTF8编码的csv，解决乱码问题
+    content = ReadFile(src, encoding="utf-8")
+    WriteFile(dst, content, encoding="utf-8-sig")
+    UTF8_2_GBK(src, dst)
 
 
 @Time_Decorator
-def POI_Buff_Clip_Landuse(landuse_path):
-    # landuse_path:原始的全国土地利用矢量图层
+def Change_File_into_Uniform_Style(EVIPath, P1, P2):
+    name_ls = os.listdir(EVIPath)
+    # 分别替换文件名中的P1和P2字符串
+    for name in name_ls:
+        if P1 in name:
+            new_name = re.sub(P1, '_P1.tif', name)
+            new_name_path = os.path.join(EVIPath, new_name)
+            old_name_path = os.path.join(EVIPath, name)
+            try:
+                os.rename(old_name_path, new_name_path)
+                print(f"文件已从 {name} 重命名为 {new_name}")
+            except Exception as e:
+                print(f"错误：重命名文件 {name} 时发生错误 - {e}")
+        elif P2 in name:
+            new_name = re.sub(P2, '_P2.tif', name)
+            new_name_path = os.path.join(EVIPath, new_name)
+            old_name_path = os.path.join(EVIPath, name)
+            try:
+                os.rename(old_name_path, new_name_path)
+                print(f"文件已从 {name} 重命名为 {new_name}")
+            except Exception as e:
+                print(f"错误：重命名文件 {name} 时发生错误 - {e}")
 
-    # 读取土地利用图层数据
-    landuse_list = fnmatch.filter(os.listdir(landuse_path), '*shp')
-    for landuse in landuse_list:
-        landuse_dataset, landuse_layercount = Open_Shp_by_GDAL(os.path.join(landuse_path, landuse))
-        landuse_layer = landuse_dataset.GetLayer()
-        print(landuse_layer.GetName())
-    # 用逐个缓冲区对土地利用数据进行clip
 
-    return
+def Get_Unique_in_List(in_list, position):
+    new_ls = []
+    for item in in_list:
+        new_ls.append(item[:position])
+    new_ls = sorted(set(new_ls))
+    return new_ls
 
 
 @Time_Decorator
-def POI_Buff_Feature_to_Layer(poi_path, out_path):
-    # poi_path:带有缓冲区的POI图层
-    # out_path:存储每个缓冲区的图层文件夹路径
+def Mosic2New_and_Clip(EVIPath, out_EVIPath, clip_shp):
+    name_ls = os.listdir(EVIPath)
+    name_ls = fnmatch.filter(name_ls, '*.tif')
+    position = 10 #MOD_EVI:18 #MCD_EVI: 14
+    new_name_ls = Get_Unique_in_List(name_ls, position)
 
-    # 读取POI图层数据
-    poi_buff_list = fnmatch.filter(os.listdir(poi_path), '*shp')
-    for poi_buff in poi_buff_list:
-        poi_buff_dataset, poi_buff_layercount = Open_Shp_by_GDAL(os.path.join(poi_path, poi_buff))
-        poi_buff_layer = poi_buff_dataset.GetLayer()
+    # 将原始数据路径作为工作空间，对同名的EVI进行合并操作
+    arcpy.env.workspace = EVIPath
+    for name in new_name_ls:
+        arcpy.env.workspace = EVIPath
+        target_raster = f'{name}_P1.tif'
+        in_raster = f'{name}_P2.tif'
+        # out_name = f'{name}.tif'
+        arcpy.Mosaic_management(in_raster, target_raster)
 
-        # 获取每个地级市POI矢量文件的名称，并根据此名称建立输出文件夹路径
-        poi_buff_layer_name = poi_buff_layer.GetName()
-        print(poi_buff_layer_name)
-        # 按照图层名称(每个地级市的POI名称)新建文件夹
-        layer_fold_path = os.path.join(out_path, poi_buff_layer_name)
-        # 如果输出的文件夹路径不存在，则新建
-        if not os.path.exists(layer_fold_path):
-            os.makedirs(layer_fold_path)
-
-        # 将每一个图层中的feature转换为layer矢量
-        poi_buff_feature = poi_buff_layer.GetNextFeature()
-        while poi_buff_feature:
-            # 获取每一个feature的第一个字段,即名称
-            poi_buff_feature_attris = poi_buff_feature.GetField(0)
-            # 根据每个feature命名其对应的新图层
-            Feature_to_Layer(poi_buff_feature, poi_buff_layer, layer_fold_path, poi_buff_feature_attris)
-            # print(f'{poi_buff_feature_attris} is Done!')
-            poi_buff_feature = poi_buff_layer.GetNextFeature()
-    return
+        # 将合并完成后的EVI图层，逐个按照国界裁剪
+        arcpy.env.workspace = out_EVIPath
+        arcpy.env.overwriteOutput = True
+        extract_area = 'INSIDE'
+        out_ras = f'{name}.tif'
+        in_ras = os.path.join(EVIPath, target_raster)
+        extract_result = arcpy.sa.ExtractByMask(in_ras, clip_shp, extract_area)
+        extract_result.save(out_ras)
+        print(name)
 
 
 if __name__ == "__main__":
-    DataRootPath = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/'
-    POIs_Fold = os.path.join(DataRootPath, '9-中国POI数据/')
-    Landuse_Fold = os.path.join(DataRootPath, '10-中国EULUC数据/')
+    RootPath = r'F:/'
+    MCDEVIPath = os.path.join(RootPath, 'MCD_EVI/')
+    MODEVIPath = os.path.join(RootPath, 'MOD_EVI/')
+    MODLSTPath = os.path.join(RootPath, 'MOD_LST/')
 
-    # 对POI数据进行缓冲区分析
-    buffer_distance = 0.01
-    out_buff_path = os.path.join(POIs_Fold, '全国地级市POI_中类工厂_缓冲区')
-    pois_path = os.path.join(POIs_Fold, '全国地级市POI_中类工厂.gdb')
-    # Poi_Buff_of_China(pois_path, out_buff_path, buffer_distance)
+    # 1.统一修改evi文件名
+    pattern1 = '-0000000000-0000046592.tif'
+    pattern2 = '-0000000000-0000069888.tif'
+    Change_File_into_Uniform_Style(MODLSTPath, pattern1, pattern2)
 
-
-    # 根据每个POI点对应的缓冲区对土地利用数据进行分割
-    out_single_buff_path = os.path.join(POIs_Fold, '全国地级市POI_中类工厂_缓冲区_逐个输出/')
-    # 首先,将POI缓冲区逐个生成一个圆形图层
-    POI_Buff_Feature_to_Layer(out_buff_path, out_single_buff_path)
-    # 然后,逐个圆形图层clip土地利用图层,得到每个工厂周围的土地利用类型
-    landuse_path = os.path.join(Landuse_Fold, 'EULUC-2018/')
-    POI_Buff_Clip_Landuse(landuse_path)
+    # 2.裁剪、合并每月的两幅evi
+    out_evi_path = os.path.join(RootPath, 'MCD_EVI_Processed/')
+    out_modevi_path = os.path.join(RootPath, 'MOD_EVI_Processed')
+    out_modlst_path = os.path.join(RootPath, 'MOD_LST_Processed')
+    cliped_shp_path = r'F:/ChinaShapefile/ChinaProvince_HKMacau/ChinaProvince_ALL_Merge.shp'
+    Mosic2New_and_Clip(MODLSTPath, out_modlst_path, cliped_shp_path)
 
 
 
 
-    # # out_landuse_path = os.path.join(landuse_path, '全国地级市EULUC_由POI裁剪得到/')
-    # in_ds = ogr.Open(os.path.join(landuse_path, 'euluc-latlonnw.shp'))
-    # in_lyr = in_ds.GetLayer()
-    #
-    # method_ds = ogr.Open(os.path.join(out_buff_path, '北京_POI_中类工厂.shp'))
-    # method_lyr = method_ds.GetLayer()
-    #
-    # fname = os.path.join(out_landuse_path, 'Clipped.shp')
-    # # 创建被裁剪以后的输出文件
-    # driver = ogr.GetDriverByName('ESRI Shapefile')
-    # if os.path.exists(fname):
-    #     driver.DeleteDataSource(fname)
-    #
-    # # 新建DataSource，Layer
-    # out_ds = driver.CreateDataSource(fname)
-    # out_lyr = out_ds.CreateLayer(fname, in_lyr.GetSpatialRef(), in_lyr.GetGeomType())
-    #
-    # # 开始进行裁剪
-    # in_lyr.Clip(method_lyr, out_lyr)
-    # out_ds.FlushCache()
-    # del in_ds, method_ds, out_ds
-    # print(fname)
+
+
 
 
 
