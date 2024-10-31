@@ -5,7 +5,6 @@ import os
 import functools
 import time
 import codecs
-import pandas as pd
 import re
 import fnmatch
 
@@ -126,18 +125,14 @@ if __name__ == "__main__":
     # 1.统一修改evi文件名
     pattern1 = '-0000000000-0000046592.tif'
     pattern2 = '-0000000000-0000069888.tif'
-    Change_File_into_Uniform_Style(MODLSTPath, pattern1, pattern2)
+    # Change_File_into_Uniform_Style(MODLSTPath, pattern1, pattern2)
 
     # 2.裁剪、合并每月的两幅evi
     out_evi_path = os.path.join(RootPath, 'MCD_EVI_Processed/')
     out_modevi_path = os.path.join(RootPath, 'MOD_EVI_Processed')
     out_modlst_path = os.path.join(RootPath, 'MOD_LST_Processed')
     cliped_shp_path = r'F:/ChinaShapefile/ChinaProvince_HKMacau/ChinaProvince_ALL_Merge.shp'
-    Mosic2New_and_Clip(MODLSTPath, out_modlst_path, cliped_shp_path)
-
-
-
-
+    # Mosic2New_and_Clip(MODLSTPath, out_modlst_path, cliped_shp_path)
 
 
 

@@ -280,8 +280,8 @@ if __name__ == "__main__":
     # POI_Export_by_Category(GDBPath, poi_category_II, poi_category_type_II, out_fold_path_II)
 
     # 5.为工厂建立缓冲区
-    out_poi_buff_fold = os.path.join(RootPath, '9.4-全国地级市POI_中类_工厂_缓冲区_500m')
-    buff_distance = 500
+    out_poi_buff_fold = os.path.join(RootPath, '9.4-全国地级市POI_中类_工厂_缓冲区_1500m')
+    buff_distance = 1500
     # Create_Buffer_of_POI(buff_distance, out_fold_path_II, out_poi_buff_fold)
 
     # 6.输出每一个缓冲区为shp(后面的代码优化了这一步骤,不再单独输出每一个缓冲区,采取先裁剪后合并的策略)
@@ -290,7 +290,7 @@ if __name__ == "__main__":
 
     # 7.使用每个缓冲区识别土地利用数据
     # 土地利用路径
-    RootPath_II = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/10-中国EULUC数据_500m/'
+    RootPath_II = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/10-中国EULUC数据_1500m/'
     Single_Prov_Landuse_Fold = os.path.join(RootPath_II, '10.1-EULUC-2018_单个省市/')
     Out_Landuse_fold = os.path.join(RootPath_II, '10.2-全国各地级市EULUC_工厂缓冲区内土地利用/')
     # Landuse_in_Buff(Single_Prov_Landuse_Fold, Out_Landuse_fold, out_poi_buff_fold)
