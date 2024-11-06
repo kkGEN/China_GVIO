@@ -2,12 +2,12 @@
 import os
 import functools
 import time
-import pandas as pd
-import fnmatch
-import shutil
 import numpy as np
 import arcpy
+import pandas as pd
 import re
+import fnmatch
+import shutil
 
 
 def Time_Decorator(func):
@@ -50,7 +50,6 @@ def List_Element_Minus(list1, list2):
     return folder_file
 
 
-@Time_Decorator
 def Move_Files_to_Folder(root_path):
     # 按照年月新建文件夹
     Creat_New_Folder(root_path)
@@ -72,28 +71,23 @@ def Move_Files_to_Folder(root_path):
         print(f'{folder} Done!')
 
 
-@Time_Decorator
-def Reshape_Excel(root_path, out_root_path, path, read_fields):
-    # 按三类数据名称创建输出文件路径
-    out_path = Make_Out_Dirs(root_path, out_root_path)
-    # 逐月遍历原始数据文件夹（以月份编号）
+def Reshape_Excel(root_path, path, out_path):
     for yearmonth in path:
         yearmonth_path = os.path.join(root_path, yearmonth)
         single_file_path = os.listdir(yearmonth_path)
-        # 创建月份文件夹，存储输出数据
+
         out_month_path = os.path.join(out_path, yearmonth)
         if not os.path.exists(out_month_path):
             os.makedirs(out_month_path)
 
-        # 遍历每个原始excel文件
         for table in single_file_path:
             table_path = os.path.join(yearmonth_path, table)
             out_table_path = os.path.join(out_month_path, table)
-            # 按照原始ID进行分组
-            df_table = pd.read_excel(table_path, usecols=read_fields)
-            df_table_groupby = df_table.groupby('ORIG_FID')
 
+            df_table = pd.read_excel(table_path, usecols=fields)
+            df_table_groupby = df_table.groupby('ORIG_FID')
             Columns = ['ID', '0', '101', '201', '202', '301', '401', '402', '403', '501', '502', '503', '504', '505']
+
             df_new = pd.DataFrame(columns=Columns)
             for key, value in df_table_groupby:
                 df_new.loc[key, 'ID'] = key
@@ -105,15 +99,6 @@ def Reshape_Excel(root_path, out_root_path, path, read_fields):
             df_new.to_excel(out_table_path)
             print(df_new)
 
-
-@Time_Decorator
-def Execute_Reshape_Excel(root_path):
-    excel_folders = os.listdir(root_path)
-    for folder in excel_folders:
-        excel_yearmonth = os.path.join(root_path, folder)
-        # 地表温度,夜间灯光,植被指数
-        file_path = os.listdir(excel_yearmonth)
-        Reshape_Excel(excel_yearmonth, out_root_path, file_path, fields)
 
 
 def Make_Out_Dirs(folder_name, root_path):
@@ -127,11 +112,13 @@ def Make_Out_Dirs(folder_name, root_path):
 if __name__ == "__main__":
     rootpath = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/'
     fields = ['ORIG_FID', 'Level2', 'grid_code', 'Shape_Area']
-    excel_files_path = os.path.join(rootpath, '11-工厂缓冲区内灯光植被地温excel/')
+    excel_files_path = os.path.join(rootpath, '11-工厂缓冲区土地利用对应植被指数excel/')
     out_root_path = os.path.join(rootpath, r'12-工厂缓冲区内各类特征提取/')
 
     # 1.按照年月重新分类存储excel
     # Move_Files_to_Folder(excel_files_path)
 
-    # 2.根据不同土地利用类型将各类数据excel结果进行变形
-    # Execute_Reshape_Excel(excel_files_path)
+    # 2.根据不同土地利用类型
+    file_path = os.listdir(excel_files_path)
+    out_folder = Make_Out_Dirs(excel_files_path, out_root_path)
+    Reshape_Excel(excel_files_path, file_path, out_folder)
