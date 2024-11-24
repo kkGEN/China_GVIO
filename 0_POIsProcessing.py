@@ -392,7 +392,6 @@ def Concat_POIbuff_and_EULUCindustry_Ras(in_poi_path, in_euluc_path, out_path):
                 print(e)
 
 
-
 if __name__ == "__main__":
     RootPath = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/9-中国POI数据/'
     RawPOIPath = os.path.join(RootPath, '9.0-全国地级市POI原始数据/')
