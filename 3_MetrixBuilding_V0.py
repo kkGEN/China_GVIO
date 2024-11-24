@@ -123,4 +123,4 @@ if __name__ == "__main__":
     # 2.根据不同土地利用类型
     file_path = os.listdir(excel_files_path)
     out_folder = Make_Out_Dirs(excel_files_path, out_root_path)
-    Reshape_Excel(excel_files_path, file_path, out_folder)
+    # Reshape_Excel(excel_files_path, file_path, out_folder)

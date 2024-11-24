@@ -9,7 +9,6 @@ import pandas as pd
 import re
 import fnmatch
 
-
 def Time_Decorator(func):
     # 输出函数运行时间的修饰器
     @functools.wraps(func)
@@ -21,7 +20,6 @@ def Time_Decorator(func):
         end_time = time.time()
         print(f'{func.__name__} Excution_time: {end_time - start_time}.')
         return result
-
     return wrapper
 
 
@@ -86,6 +84,7 @@ def CSV_to_Shapfile(rawpoi, gdbpath):
             print(f'{out_poi_feature} done!')
 
 
+
 def Concat_DijishiPOI_to_Provincial(in_path, out_path):
     prov_gdb_path = os.listdir(in_path)
     for prov_gdb in prov_gdb_path:
@@ -132,6 +131,8 @@ def ProvPOI_Clip_by_DijishiShape(dijishi_shape, in_prov_poi, dijishi_poi):
             arcpy.env.overwriteOutput = True
             arcpy.Clip_analysis(prov_poi, clip_feature, out_dijishi_poi)
             print(dijishi)
+
+
 
 
 @Time_Decorator
@@ -308,7 +309,7 @@ def Landuse_Dissolve(lu_iden_fold, lu_diss_fold):
         iden_path_list = arcpy.ListFeatureClasses()
         for iden in iden_path_list:
             out_iden = os.path.join(out_iden_gdb_path, re.sub(r'POI_工厂_buff_iden', '_FactoryLU', iden))
-            arcpy.management.Dissolve(iden, out_iden, ["ORIG_FID", "Level2"])  # , "SINGLE_PART", "DISSOLVE_LINES"
+            arcpy.management.Dissolve(iden, out_iden, ["ORIG_FID", "Level2"])  #, "SINGLE_PART", "DISSOLVE_LINES"
             print(f'{iden} done!')
 
 
@@ -364,7 +365,7 @@ def Concat_POIbuff_and_EULUCindustry_Ras(in_poi_path, in_euluc_path, out_path):
     for prov_gdb in poi_ras_path:
         poi_ras = os.path.join(in_poi_path, prov_gdb)
         euluc_ras = os.path.join(in_euluc_path, prov_gdb)
-        # 创建输出poi和euluc合并图层的数据库
+
         poi_euluc_gdb = os.path.join(out_path, prov_gdb)
         Creat_New_GDB(out_path, prov_gdb, poi_euluc_gdb)
 
@@ -374,7 +375,7 @@ def Concat_POIbuff_and_EULUCindustry_Ras(in_poi_path, in_euluc_path, out_path):
             single_poi = os.path.join(poi_ras, poi)
             singel_euluc = os.path.join(euluc_ras, f'{poi[:-12]}_EULUC_Indus')
             out_poi_euluc_path = os.path.join(poi_euluc_gdb, f'{poi[:-12]}')
-            # 设置当前工作空间为输出路径，方便测试
+
             arcpy.env.workspace = poi_euluc_gdb
             arcpy.env.overwriteOutput = True
             try:
@@ -390,6 +391,7 @@ def Concat_POIbuff_and_EULUCindustry_Ras(in_poi_path, in_euluc_path, out_path):
                     print(f'----{singel_euluc} not exist!----')
             except Exception as e:
                 print(e)
+
 
 
 
@@ -451,8 +453,6 @@ if __name__ == "__main__":
     # 9. 将每个地级市的poi和土地利用栅格数据集合并
     POI_EULUC_Ras_Path = os.path.join(RootPath_II, f'10.3-POI_Buff和EULUC_Indus_Ras_{buff_distance}m/')
     # Concat_POIbuff_and_EULUCindustry_Ras(POI_Buff_Ras_Path, EULUC_Ras_Path, POI_EULUC_Ras_Path)
-
-    # 10.
 
 
 

@@ -135,3 +135,8 @@ if __name__ == "__main__":
 
     # 2.根据不同土地利用类型将各类数据excel结果进行变形
     # Execute_Reshape_Excel(excel_files_path)
+
+    # 3.（第二种数据预处理路径）将POI和EULUC矢量转换为与遥感影像数据相同分辨率的栅格
+
+    # 4. 提取POI和EULUC图层对应的各种影像的地级市层次的数据矩阵
+

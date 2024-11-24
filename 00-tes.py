@@ -9,7 +9,6 @@ import pandas as pd
 import re
 import fnmatch
 
-
 def Time_Decorator(func):
     # 输出函数运行时间的修饰器
     @functools.wraps(func)
@@ -21,7 +20,6 @@ def Time_Decorator(func):
         end_time = time.time()
         print(f'{func.__name__} Excution_time: {end_time - start_time}.')
         return result
-
     return wrapper
 
 
@@ -86,6 +84,7 @@ def CSV_to_Shapfile(rawpoi, gdbpath):
             print(f'{out_poi_feature} done!')
 
 
+
 def Concat_DijishiPOI_to_Provincial(in_path, out_path):
     prov_gdb_path = os.listdir(in_path)
     for prov_gdb in prov_gdb_path:
@@ -132,6 +131,8 @@ def ProvPOI_Clip_by_DijishiShape(dijishi_shape, in_prov_poi, dijishi_poi):
             arcpy.env.overwriteOutput = True
             arcpy.Clip_analysis(prov_poi, clip_feature, out_dijishi_poi)
             print(dijishi)
+
+
 
 
 @Time_Decorator
@@ -308,7 +309,7 @@ def Landuse_Dissolve(lu_iden_fold, lu_diss_fold):
         iden_path_list = arcpy.ListFeatureClasses()
         for iden in iden_path_list:
             out_iden = os.path.join(out_iden_gdb_path, re.sub(r'POI_工厂_buff_iden', '_FactoryLU', iden))
-            arcpy.management.Dissolve(iden, out_iden, ["ORIG_FID", "Level2"])  # , "SINGLE_PART", "DISSOLVE_LINES"
+            arcpy.management.Dissolve(iden, out_iden, ["ORIG_FID", "Level2"])  #, "SINGLE_PART", "DISSOLVE_LINES"
             print(f'{iden} done!')
 
 
@@ -359,37 +360,50 @@ def Export_301type_of_EULUC(prov_euluc_fold, out_fold):
         print(f'{prov} done!')
 
 
-def Concat_POIbuff_and_EULUCindustry_Ras(in_poi_path, in_euluc_path, out_path):
-    poi_ras_path = os.listdir(in_poi_path)
-    for prov_gdb in poi_ras_path:
-        poi_ras = os.path.join(in_poi_path, prov_gdb)
-        euluc_ras = os.path.join(in_euluc_path, prov_gdb)
-        # 创建输出poi和euluc合并图层的数据库
-        poi_euluc_gdb = os.path.join(out_path, prov_gdb)
-        Creat_New_GDB(out_path, prov_gdb, poi_euluc_gdb)
+def Union_POIbuff_and_EULUCindustry(in_poi_path, in_euluc_path, out_path):
+    dijishi_euluc_path = os.listdir(in_euluc_path)
+    # dijishi_euluc_path = fnmatch.filter(dijishi_euluc_path, '*.shp')
+    for prov_gdb in dijishi_euluc_path:
+        prov_gdb_path = os.path.join(in_euluc_path, prov_gdb)
+        # 创建poi和euluc的输出GDB
+        out_poi_euluc_gdb = os.path.join(out_path, prov_gdb)
+        Creat_New_GDB(out_path, prov_gdb, out_poi_euluc_gdb)
+        # 读取poi数据gdb
+        poi_buff_path = os.path.join(in_poi_path, prov_gdb)
+        # 以euluc文件存储目录为顺序依次读取
+        arcpy.env.workspace = prov_gdb_path
+        dijishi_path = arcpy.ListFeatureClasses()
+        for dijishi in dijishi_path:
+            # euluc数据路径
+            dijishi_euluc = os.path.join(prov_gdb_path, dijishi)
+            # 输出poi和euluc路径
+            out_poi_euluc = os.path.join(out_poi_euluc_gdb, dijishi)
+            # poi数据路径
+            poi_buff = os.path.join(poi_buff_path, f'{prov_gdb[:-4]}_{dijishi[:-11]}POI_工厂_buff')
+            arcpy.Union_analysis([dijishi_euluc, poi_buff], out_poi_euluc)
+            print(f'{dijishi} done')
 
-        arcpy.env.workspace = poi_ras
-        poi_path = arcpy.ListRasters()
-        for poi in poi_path:
-            single_poi = os.path.join(poi_ras, poi)
-            singel_euluc = os.path.join(euluc_ras, f'{poi[:-12]}_EULUC_Indus')
-            out_poi_euluc_path = os.path.join(poi_euluc_gdb, f'{poi[:-12]}')
-            # 设置当前工作空间为输出路径，方便测试
-            arcpy.env.workspace = poi_euluc_gdb
-            arcpy.env.overwriteOutput = True
-            try:
-                if arcpy.Exists(singel_euluc):
-                    print(poi)
-                    # 将各种栅格空值部分填充
-                    out_poi_withoutnull = arcpy.sa.Con(IsNull(single_poi), -300, single_poi)
-                    out_euluc_withoutnull = arcpy.sa.Con(IsNull(singel_euluc), 300, singel_euluc)
 
-                    out_poi_euluc = Raster(out_poi_withoutnull) + Raster(out_euluc_withoutnull)
-                    out_poi_euluc.save(out_poi_euluc_path)
-                else:
-                    print(f'----{singel_euluc} not exist!----')
-            except Exception as e:
-                print(e)
+def POIbuff_and_EULUCindustry_to_Ras(in_path, out_path):
+    prov_gdb_path = os.listdir(in_path)
+    for prov_gdb in prov_gdb_path:
+        # 设置并判断输出gdb是否存在
+        out_prov_gdb_path = os.path.join(out_path, prov_gdb)
+        Creat_New_GDB(out_path, prov_gdb, out_prov_gdb_path)
+
+        # 设置工作空间，读取每个省的地级市poi和euluc
+        dijishi_path = os.path.join(in_path, prov_gdb)
+        arcpy.env.workspace = dijishi_path
+        dijishi_poieuluc_path = arcpy.ListFeatureClasses()
+        for poieuluc in dijishi_poieuluc_path:
+            # 矢量转栅格的输入数据
+            in_feature = os.path.join(dijishi_path, poieuluc)
+            cell_size = 0.0041666667
+            out_raster = os.path.join(out_prov_gdb_path, f'{poieuluc[:-11]}')
+            arcpy.FeatureToRaster_conversion(in_feature, 'Level2', out_raster, cell_size)
+            print(f'{poieuluc} done')
+
+
 
 
 
@@ -426,7 +440,7 @@ if __name__ == "__main__":
     # POI_Export_by_Category(Shape_Dijishi_POI, poi_category_II, poi_category_type_II, out_fold_path_II)
 
     # 6.为工厂建立缓冲区
-    buff_distance = 1000
+    buff_distance = 500
     out_poi_buff_fold = os.path.join(RootPath, f'9.5-全国地级市POI_中类_工厂_缓冲区_{buff_distance}m')
     # Create_Buffer_of_POI(buff_distance, out_fold_path_II, out_poi_buff_fold)
 
@@ -450,9 +464,117 @@ if __name__ == "__main__":
 
     # 9. 将每个地级市的poi和土地利用栅格数据集合并
     POI_EULUC_Ras_Path = os.path.join(RootPath_II, f'10.3-POI_Buff和EULUC_Indus_Ras_{buff_distance}m/')
-    # Concat_POIbuff_and_EULUCindustry_Ras(POI_Buff_Ras_Path, EULUC_Ras_Path, POI_EULUC_Ras_Path)
 
-    # 10.
+    poi_ras_path = os.listdir(POI_Buff_Ras_Path)
+    for prov_gdb in poi_ras_path:
+        poi_ras = os.path.join(POI_Buff_Ras_Path, prov_gdb)
+        euluc_ras = os.path.join(EULUC_Ras_Path, prov_gdb)
+
+        poi_euluc_gdb = os.path.join(POI_EULUC_Ras_Path, prov_gdb)
+        Creat_New_GDB(POI_EULUC_Ras_Path, prov_gdb, poi_euluc_gdb)
+
+        arcpy.env.workspace = poi_ras
+        poi_path = arcpy.ListRasters()
+        for poi in poi_path:
+            single_poi = os.path.join(poi_ras, poi)
+            singel_euluc = os.path.join(euluc_ras, f'{poi[:-12]}_EULUC_Indus')
+            out_poi_euluc_path = os.path.join(poi_euluc_gdb, f'{poi[:-12]}')
+
+            arcpy.env.workspace = poi_euluc_gdb
+            arcpy.env.overwriteOutput = True
+            try:
+                if arcpy.Exists(singel_euluc):
+                    print(poi)
+                    # out_poi_euluc = Raster(single_poi) + Raster(singel_euluc)
+                    # out_poi_euluc = arcpy.sa.Con([single_poi, singel_euluc], f'{poi},tif')
+                    # out_poi_euluc.save(out_poi_euluc_path)
+                    out_poi_withoutnull = arcpy.sa.Con(IsNull(single_poi), -300, single_poi)
+                    out_euluc_withoutnull = arcpy.sa.Con(IsNull(singel_euluc), 300, singel_euluc)
+                    # out_poi_euluc.save(out_poi_euluc_path)
+                    out_poi_euluc = Raster(out_poi_withoutnull) + Raster(out_euluc_withoutnull)
+                    out_poi_euluc.save(out_poi_euluc_path)
+
+                else:
+                    print(f'----{singel_euluc} not exist!----')
+            except Exception as e:
+                print(e)
+
+
+
+
+            # # 判断土地利用图层是否为空，空值则只保留poi栅格，否则二者相加
+            # if Raster(singel_euluc) == None:
+            #     arcpy.CopyRaster_management(single_poi, out_poi_euluc)
+            # else:
+            #     out_poi_euluc = Raster(single_poi) + Raster(singel_euluc)
+
+
+
+
+
+
+
+    # out_poi_euluc_path = os.path.join(RootPath_II, r'10.4-地级市poi-buff和euluc-industry/')
+    # ras_mask_path = os.path.join(RootPath_II, r'10.5-地级市poi-buff和euluc-industry栅格掩膜/')
+    # Union_POIbuff_and_EULUCindustry(out_poi_buff_fold, Single_Dijishi_Landuse_Fold, out_poi_euluc_path)
+
+    # 6.输出每一个缓冲区为shp(后面的代码优化了这一步骤,不再单独输出每一个缓冲区,采取先裁剪后合并的策略)
+    # out_single_buff_fold = os.path.join(RootPath, '9.5-全国地级市POI_中类_工厂_缓冲区_逐个输出')
+    # POI_Single_Buff_to_Shp(out_poi_buff_fold, out_single_buff_fold)
+
+    # 7.使用每个缓冲区识别土地利用数据
+    # 土地利用路径
+    # RootPath_II = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/10-中国EULUC数据_1500m/'
+    # Single_Prov_Landuse_Fold = os.path.join(RootPath_II, '10.1-EULUC-2018_单个省市/')
+    # Single_Dijishi_Landuse_Fold = os.path.join(RootPath_II, '10.1-EULUC-2018_单个地级市/')
+    # Clip_Shape_Path = r'C:/Users/KJ/Documents/ChinaMonthlyIndustrial/0-地级市矢量-中文/'
+    # Clip_Euluc_to_Single_Dijishi(Clip_Shape_Path, Single_Prov_Landuse_Fold, Single_Dijishi_Landuse_Fold)
+    # Out_Landuse_fold = os.path.join(RootPath_II, '10.2-全国各地级市EULUC_工厂缓冲区内土地利用/')
+    # Landuse_in_Buff(Single_Prov_Landuse_Fold, Out_Landuse_fold, out_poi_buff_fold)
+
+    # [废弃] 8. 输出各省土地利用中的工业用地
+    # out_prov_euluc_path = os.path.join(RootPath_II, r'10.3-分省EULUC工业用地/')
+    # Export_301type_of_EULUC(Single_Prov_Landuse_Fold, out_prov_euluc_path)
+    # Clip_Euluc_to_Single_Dijishi(Clip_Shape_Path, out_prov_euluc_path, Single_Dijishi_Landuse_Fold)
+
+    # 9. 将每个地级市的工厂POI与EULUC-工业用地进行融合，并转化为栅格
+    # out_poi_euluc_path = os.path.join(RootPath_II, r'10.4-地级市poi-buff和euluc-industry/')
+    # ras_mask_path = os.path.join(RootPath_II, r'10.5-地级市poi-buff和euluc-industry栅格掩膜/')
+    # Union_POIbuff_and_EULUCindustry(out_poi_buff_fold, Single_Dijishi_Landuse_Fold, out_poi_euluc_path)
+    # POIbuff_and_EULUCindustry_to_Ras(out_poi_euluc_path, ras_mask_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
