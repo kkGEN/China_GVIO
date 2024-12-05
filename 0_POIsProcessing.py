@@ -451,7 +451,6 @@ if __name__ == "__main__":
     POI_EULUC_Ras_Path = os.path.join(RootPath_II, f'10.3-POI_Buff和EULUC_Indus_Ras_{buff_distance}m/')
     # Concat_POIbuff_and_EULUCindustry_Ras(POI_Buff_Ras_Path, EULUC_Ras_Path, POI_EULUC_Ras_Path)
 
-    # 10.
 
 
 
