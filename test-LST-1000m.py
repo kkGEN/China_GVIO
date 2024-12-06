@@ -186,7 +186,7 @@ if __name__ == "__main__":
     Root_Path = r'E:/ChinaMonthlyIndustrial/11-各类遥感数据地级市分割/'
     Out_RS_Metrix_Path = r'E:/ChinaMonthlyIndustrial/12-遥感数据输出为矩阵/'
     RS_Data_Path_List = ['地表温度'] #'地表温度', '夜间灯光', '增强植被指数'
-    buff_dist = 500
+    buff_dist = 1000
     for rs_data_name in RS_Data_Path_List:
         rs_data_path = os.path.join(Root_Path, f'11.2-{rs_data_name}_Extract_{buff_dist}m/')
         out_rs_metrix_path = os.path.join(Out_RS_Metrix_Path, f'12.1-{rs_data_name}-{buff_dist}m/')
